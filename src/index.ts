@@ -7,44 +7,6 @@ let prev_time:number=0;
 
 let backgroundColor:ImGui.ImVec4;
 
-// class APP extends App
-// {
-//     constructor() {
-//         super();
-
-//         let fui="BlueSkin.fui";
-//         let path="res/BlueSkin/";
-//         let root="Demo";
-//         //let fui="lobby.fui";
-//         //let path="res/lobby/";
-//         //let root="Lobby";
-
-//         FGUI.Load(fui,path).then(fgui=>{
-//             this.fgui=fgui;
-//             let mgr=new zlUIMgr;
-//             mgr.Name="root";
-//             mgr.default_w=1920;
-//             mgr.default_h=720;
-//             mgr.x=0;
-//             mgr.x=0;
-//             mgr.w=mgr.default_w;
-//             mgr.h=mgr.default_h;
-
-//             let ui=fgui.Create(root, mgr);
-//             if(ui) {
-//                 console.log(ui);
-//                 mgr.AddChild(ui);
-//             }
-//             mgr.ScaleWH(this.width, this.height, ScaleMode.AspectRatio);
-//             this.mgr=mgr;
-//             console.log("load done!");
-//         })
-//     }
-
-
-
-// }
-
 function _loop(time:number):void {
     let ti=(time-prev_time)*0.001;
     prev_time=time;
