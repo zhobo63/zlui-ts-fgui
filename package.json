@@ -1,0 +1,31 @@
+{
+  "name": "zlui-ts-fgui",
+  "version": "0.0.1",
+  "description": "create fgui object to zlui-ts",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --mode=production --node-env=production",
+    "build:dev": "webpack --mode=development",
+    "build:dev_watch": "webpack --mode=development --watch",
+    "build:prod": "webpack --mode=production --node-env=production",
+    "build:prod_watch": "webpack --mode=production --node-env=production --watch",
+    "watch": "webpack --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/pako": "^2.0.4",
+    "@webpack-cli/generators": "^3.0.7",
+    "@zhobo63/imgui-ts": "^0.1.50",
+    "@zhobo63/zlui-ts": "^0.1.52",
+    "devtool": "^2.3.1",
+    "fast-xml-parser": "^5.3.3",
+    "pako": "^2.1.0",
+    "prettier": "^2.8.8",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^5.1.4"
+  }
+}
