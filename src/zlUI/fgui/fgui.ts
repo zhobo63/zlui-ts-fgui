@@ -1,15 +1,61 @@
-import { BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin } from "@zhobo63/zlui-ts";
+import { ImageFont, BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin } from "@zhobo63/zlui-ts";
 import * as ZLIB from "pako"
 import * as XML from "fast-xml-parser"
 import { ImGui_Impl } from "@zhobo63/imgui-ts";
+
+export const Version:string="0.0.1";
 
 export class FGUIButton extends UIWin
 {
     constructor(own:UIMgr)
     {
         super(own);
-        //this._csid="FGUIButton";
     }
+
+    _csid_fgui:string="FGUIButton";
+
+    Refresh(ti: number, parent?: UIWin): boolean {
+        if(this.isEnable) {
+            if(this._owner.hover==this) {
+                this.isDown=this._owner.any_pointer_down;
+            }
+            if(this.win_disable) this.win_disable.isVisible=false;
+            if(this.win_hover) this.win_hover.isVisible=false;
+            if(this.win_down) this.win_down.isVisible=false;
+            if(this.win_hover && this._owner.hover==this && !this.isDown) {
+                this.win_hover.isVisible=true;
+            }else if(this.win_down && this.isDown) {
+                this.win_down.isVisible=true;
+            }
+        }
+        else {
+            if(this.win_disable) this.win_disable.isVisible=true;
+            if(this.win_hover) this.win_hover.isVisible=false;
+            if(this.win_down) this.win_down.isVisible=false;
+        }
+        return super.Refresh(ti, parent);
+    }
+
+    CalRect(parent: UIWin): void {
+        super.CalRect(parent);
+
+        for(let ch of this.pChild) {
+            ch.isCanNotify=false;
+            if(ch.Name.startsWith("disable")) {
+                this.win_disable=ch as UIWin;
+            }
+            else if(ch.Name.startsWith("hover")) {
+                this.win_hover=ch as UIWin;
+            }
+            else if(ch.Name.startsWith("down")) {
+                this.win_down=ch as UIWin;
+            }
+        }
+    }
+
+    win_disable:UIWin;
+    win_hover:UIWin;
+    win_down:UIWin;
 }
 
 export class FGUIImageText extends UIImageText
@@ -17,7 +63,32 @@ export class FGUIImageText extends UIImageText
     constructor(own:UIMgr)
     {
         super(own);
-        //this._csid="FGUImageText";
+        this.text="";
+    }
+
+    _csid_fgui:string="FGUImageText";
+
+    CalRect(parent: UIWin): void {
+
+        this.image_font=[];
+        for(let ch of this.pChild) {
+            if(ch._csid==UIImage.CSID) {
+                ch.isCanNotify=false;
+                let img=ch as UIImage; 0
+                let imgfont:ImageFont={
+                    width:ch.w,
+                    height:ch.h,
+                    offset_x:ch.x,
+                    offset_y:ch.y,
+                    texture:img.image,
+                    uv1:img.image.uv1,
+                    uv2:img.image.uv2,
+                };
+                this.image_font.push(imgfont);
+            }                            
+        }
+
+        super.CalRect(parent);
     }
 }
 
@@ -487,6 +558,8 @@ export class FGUIPackage
         if(!name) {}
         else if(name.startsWith("btn_")) {
             type=EUIType.Button;        
+        }else if(name.startsWith("pnl_")) {
+            type=EUIType.Panel;
         }else if(name.startsWith("imagetext_")) {
             type=EUIType.ImageText;
         }
@@ -504,10 +577,21 @@ export class FGUIPackage
         //case EUIType.Image:
         //    ui=new UIImage(mgr);
         //    break;
+        case EUIType.Panel:
+            let pnl=new UIPanel(mgr);
+            pnl.isDrawClient=false;
+            pnl.isDrawBorder=false;
+            ui=pnl;
+            break;
         case EUIType.Button:
             ui=new FGUIButton(mgr);
             break;
-
+        case EUIType.ImageText:
+            ui=new FGUIImageText(mgr);
+            break;
+        default:
+            console.log(`TODO CreateWin type:${type}`, res);
+            return null;
         }
         ui.Name=name;
         return ui;
@@ -543,22 +627,30 @@ export class FGUIPackage
             case "visible":
                 ui.isVisible=val;
                 break;
-            case "alpha":
-                let img=ui as UIImage;
-                img.color=(img.color&0xFFFFFF)|((val*255)<<24);
+            case "alpha": 
+                // let img=ui as UIImage;
+                // img.color=(img.color&0xFFFFFF)|((val*255)<<24);
+                ui.SetAlpha(val);            
                 break;
             case "scale":
                 switch(val) {
-                case "9grid":
+                case "9grid": 
+                    //CreateImage() handles 9grid
+                    break;
                 case "tile":
+                    console.log("TODO scale:tile", val);
                     break;
                 default:
                     let scale=ParseVec2(val);
-                    ui.w*=scale.x;
-                    ui.h*=scale.y;
-                    ui.isCalRect=true;        
+                    // ui.w*=scale.x;
+                    // ui.h*=scale.y;
+                    // ui.isCalRect=true;        
                     break;
                 }
+                break;
+            case "pivot":
+                let v2=ParseVec2(val);
+                ui.origin.Set(v2.x, v2.y);
                 break;
             default:
                 console.log("TODO SetAttribute:"+id, {res:res, value:val});
@@ -584,10 +676,14 @@ export class FGUIPackage
                 break;
             case EScaleType.Grid9:
                 let pnl=new UIPanel(mgr);
+                pnl.rounding=0;
                 pnl.borderWidth=0;
                 pnl.isDrawClient=false;
                 pnl.isDrawBorder=false;
+                pnl.color=0xFFFFFFFF;
                 let v4=ParseVec4(res.scale9grid);
+                v4.z+=v4.x;
+                v4.w+=v4.y;
                 pnl.board={
                     x1:v4.x,
                     y1:v4.y,
@@ -611,7 +707,7 @@ export class FGUIPackage
 
     CreateFromComponent(res:any, mgr:UIMgr):UIWin
     {
-        let ui:UIWin=this.CreateWin(res, mgr);
+        let ui:UIWin=null;
         if(res.src) {
             let src=this.resources[res.src];
             ui=this.CreateFromComponent(src, mgr);

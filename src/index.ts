@@ -20,9 +20,7 @@ function _loop(time:number):void {
 
     ImGui_Impl.NewFrame(time);
     ImGui.NewFrame();
-
     gApp.MainLoop(time, ImGui.GetBackgroundDrawList());
-
     ImGui.EndFrame();
     ImGui.Render();
 
@@ -51,7 +49,8 @@ window.addEventListener('DOMContentLoaded', async () =>{
     }
 
     const canvas:HTMLCanvasElement=document.getElementById('canvas') as HTMLCanvasElement;
-    ImGui_Impl.Init(canvas);
+    let gl = canvas.getContext("webgl2", { alpha: true }) || canvas.getContext("webgl", { alpha: true });
+    ImGui_Impl.Init(gl);
 
     console.log("FontScale", ImGui_Impl.font_scale);
     console.log("CanvasScale", ImGui_Impl.canvas_scale);
