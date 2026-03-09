@@ -1,6 +1,6 @@
 {
   "name": "zlui-ts-fgui",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "create fgui object to zlui-ts",
   "main": "index.js",
   "scripts": {
@@ -19,14 +19,14 @@
     "@types/pako": "^2.0.4",
     "@webpack-cli/generators": "^3.0.7",
     "@zhobo63/imgui-ts": "^0.1.52",
-    "@zhobo63/zlui-ts": "^0.1.56",
+    "@zhobo63/zlui-ts": "^0.1.63",
     "devtool": "^2.3.1",
-    "fast-xml-parser": "^5.3.3",
+    "fast-xml-parser": "^5.4.2",
     "pako": "^2.1.0",
     "prettier": "^2.8.8",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
-    "webpack": "^5.104.1",
+    "webpack": "^5.105.4",
     "webpack-cli": "^5.1.4"
   }
 }

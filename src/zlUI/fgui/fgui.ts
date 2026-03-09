@@ -1,9 +1,9 @@
-import { ImageFont, BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin } from "@zhobo63/zlui-ts";
+import { ImageFont, BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin, UpdateTexturePack } from "@zhobo63/zlui-ts";
 import * as ZLIB from "pako"
 import * as XML from "fast-xml-parser"
 import { ImGui_Impl } from "@zhobo63/imgui-ts";
 
-export const Version:string="0.0.1";
+export const Version:string="0.0.2";
 
 export class FGUIButton extends UIWin
 {
@@ -41,7 +41,10 @@ export class FGUIButton extends UIWin
 
         for(let ch of this.pChild) {
             ch.isCanNotify=false;
-            if(ch.Name.startsWith("disable")) {
+            if(!ch.Name) {
+
+            }
+            else if(ch.Name.startsWith("disable")) {
                 this.win_disable=ch as UIWin;
             }
             else if(ch.Name.startsWith("hover")) {
@@ -71,20 +74,24 @@ export class FGUIImageText extends UIImageText
     CalRect(parent: UIWin): void {
 
         this.image_font=[];
+        this.ascii={};
         for(let ch of this.pChild) {
             if(ch._csid==UIImage.CSID) {
                 ch.isCanNotify=false;
-                let img=ch as UIImage; 0
+                let img=ch as UIImage; 
+                if(img.image)
+                    UpdateTexturePack(img.image);
                 let imgfont:ImageFont={
                     width:ch.w,
                     height:ch.h,
                     offset_x:ch.x,
                     offset_y:ch.y,
                     texture:img.image,
-                    uv1:img.image.uv1,
-                    uv2:img.image.uv2,
+                    uv1:img.image?.uv1,
+                    uv2:img.image?.uv2,
                 };
-                this.image_font.push(imgfont);
+                let inx=this.image_font.push(imgfont);
+                this.ascii[img.Name]=inx-1;
             }                            
         }
 
@@ -293,6 +300,7 @@ interface Vec4
 function toTexturePack(sprite:Sprite):TexturePack
 {
     return {
+        name:sprite.id,
         x1:sprite.x,
         y1:sprite.y,
         x2:sprite.x+sprite.width,
@@ -372,6 +380,7 @@ class FGUIXmlFile extends FGUIFile
                 allowBooleanAttributes: true,
                 parseAttributeValue: true,
                 parseTagValue: true,
+                preserveOrder: true,
             });
         this.data=xml_parser.parse(source);
     }
@@ -420,29 +429,31 @@ class FGUIXmlParser
 
     async CreateAtlas(atlas :any, name:string)
     {
+        let attr=atlas[":@"];
         atlas.type=EResourceType.Atlas;
         atlas.texture=new ImGui_Impl.Texture;
         let image=new Image;
         let loadprocess=LoadImage(image).then(r=>{
             atlas.texture.Update(image);
-            console.log("load image "+ atlas.file);
+            console.log("load image "+ attr.file);
         });
         image.crossOrigin="anonymous";            
-        image.src=this.package.path+name+"@"+atlas.file;
+        image.src=this.package.path+name+"@"+attr.file;
         await loadprocess;
-        this.package.textures[atlas.id]=atlas.texture;
+        this.package.textures[attr.id]=atlas.texture;
     }
     CreateResourceComponent(component:any)
     {
+        let attr=component[":@"];
         let own=this.package;
         component.type=EResourceType.Component;
-        let id=component.id+".xml";
+        let id=attr.id+".xml";
         let file=own.files[id];
         if(file) {
-            component.component=file.data.component;
+            component.component=file.data[0].component;
         }
-        own.resources[component.name]=component;
-        own.resources[component.id]=component;
+        own.resources[attr.name]=component;
+        own.resources[attr.id]=component;
     }
 
     async ParseResource()
@@ -451,32 +462,22 @@ class FGUIXmlParser
         let item=own.files["package.xml"];
         console.log("ParseResource", item);
 
-        let name=item.data.packageDescription.name;
-        if(Array.isArray(item.data.packageDescription.resources.atlas)) {
-            for(let atlas of item.data.packageDescription.resources.atlas) {
-                await this.CreateAtlas(atlas, name);
+        let attr=item.data[0][":@"];
+        let packageDescription=item.data[0].packageDescription;
+        let name=attr.name;
+        for(let res of packageDescription[0].resources) {
+            if(Array.isArray(res.atlas)) {
+                await this.CreateAtlas(res, name);
             }
-        }else {
-            await this.CreateAtlas(item.data.packageDescription.resources.atlas, name);
-        }
-        if(Array.isArray(item.data.packageDescription.resources.component)) {
-            for(let component of item.data.packageDescription.resources.component) {
-                this.CreateResourceComponent(component);
+            else if(Array.isArray(res.component)) {
+                this.CreateResourceComponent(res);
             }
-        }else {
-            this.CreateResourceComponent(item.data.packageDescription.resources.component);
-        }
-        if(Array.isArray(item.data.packageDescription.resources.image)) {
-            for(let image of item.data.packageDescription.resources.image) {
-                image.type=EResourceType.Image;
-                own.resources[image.name]=image;
-                own.resources[image.id]=image;
+            else if(Array.isArray(res.image)) {
+                let attr=res[":@"];
+                res.type=EResourceType.Image;
+                own.resources[attr.name]=res;
+                own.resources[attr.id]=res;
             }
-        }else {
-            let image = item.data.packageDescription.resources.image;
-            image.type=EResourceType.Image;
-            own.resources[image.name]=image;
-            own.resources[image.id]=image;
         }
     }
     ParseSprite()
@@ -537,6 +538,8 @@ export class FGUIPackage
         let ui:UIWin=null;
         if(res) {
             ui=this.CreateFromResource(res, mgr);
+        }else {
+            console.error("fgui resource not found", name);
         }
         return ui;
     }
@@ -547,6 +550,13 @@ export class FGUIPackage
         case EResourceType.Component:
             ui=this.CreateFromComponent(res, mgr);
             break;
+        case EResourceType.Image:
+        case EResourceType.Loader:
+            ui=this.CreateImage(res, mgr);
+            break;
+        default:
+            console.warn("TODO CreateFromResource", res);
+            break;
         }
         return ui;
     }
@@ -554,7 +564,8 @@ export class FGUIPackage
     CreateWin(res:any, mgr:UIMgr):UIWin
     {
         let type:EUIType=EUIType.Win;
-        let name=res.name;
+        let attr=res[":@"];
+        let name=attr.name;
         if(!name) {}
         else if(name.startsWith("btn_")) {
             type=EUIType.Button;        
@@ -590,7 +601,7 @@ export class FGUIPackage
             ui=new FGUIImageText(mgr);
             break;
         default:
-            console.log(`TODO CreateWin type:${type}`, res);
+            console.warn(`TODO CreateWin type:${type}`, res);
             return null;
         }
         ui.Name=name;
@@ -598,8 +609,9 @@ export class FGUIPackage
     }
     SetAttribute(res:any, ui:UIWin)
     {
-        for(let id in res) {
-            let val=res[id];
+        let attr=res[":@"]
+        for(let id in attr) {
+            let val=attr[id];
             switch(id) {
             case "id":
             case "path":
@@ -610,7 +622,7 @@ export class FGUIPackage
             case "exported":
                 break;
             case "name":
-                ui.Name=val;
+                ui.Name=`${val}`;
                 break;
             case "xy":
                 let pos=ParseVec2(val);
@@ -628,8 +640,6 @@ export class FGUIPackage
                 ui.isVisible=val;
                 break;
             case "alpha": 
-                // let img=ui as UIImage;
-                // img.color=(img.color&0xFFFFFF)|((val*255)<<24);
                 ui.SetAlpha(val);            
                 break;
             case "scale":
@@ -642,6 +652,12 @@ export class FGUIPackage
                     break;
                 default:
                     let scale=ParseVec2(val);
+                    if(scale.x<0) {
+                        ui.FlipW();
+                    }
+                    if(scale.y<0) {
+                        ui.FlipH();
+                    }
                     // ui.w*=scale.x;
                     // ui.h*=scale.y;
                     // ui.isCalRect=true;        
@@ -652,22 +668,40 @@ export class FGUIPackage
                 let v2=ParseVec2(val);
                 ui.origin.Set(v2.x, v2.y);
                 break;
+            case "flip":
+                switch(val) {
+                case "hz":
+                    ui.FlipW();
+                    break;
+                }
+                break;
+            case "color":
+                ui.SetColor(val);
+                break;
             default:
-                console.log("TODO SetAttribute:"+id, {res:res, value:val});
+                console.warn("TODO SetAttribute:"+id, {res:res, value:val});
                 break;
             }
         }
     }
 
     CreateImage(res:any, mgr:UIMgr):UIImage
-    {
+    {        
+        let attr=res[":@"];
         let ui:UIImage=null;
-        let scale_type=ScaleType(res.scale);
-        if(res.src) {
-            let src=this.resources[res.src];
-            ui=this.CreateImage(src, mgr);
+        if(!res) {
+        }
+        else if(attr.src) {
+            let src=this.resources[attr.src];
+            if(src === undefined) {
+                console.warn("fgui CreateImage src not found", res);
+                ui=new UIImage(mgr);
+            }else {
+                ui=this.CreateImage(src, mgr);
+            }
         }else {
-            let sprite=this.sprites[res.id];
+            let sprite=this.sprites[attr.id];
+            let scale_type=ScaleType(attr.scale);
             switch(scale_type) {
             case EScaleType.None:
                 ui=new UIImage(mgr);
@@ -681,7 +715,7 @@ export class FGUIPackage
                 pnl.isDrawClient=false;
                 pnl.isDrawBorder=false;
                 pnl.color=0xFFFFFFFF;
-                let v4=ParseVec4(res.scale9grid);
+                let v4=ParseVec4(attr.scale9grid);
                 v4.z+=v4.x;
                 v4.w+=v4.y;
                 pnl.board={
@@ -699,76 +733,53 @@ export class FGUIPackage
                 return ui;
             }
         }
-        if(!ui)
-            return ui;
-        this.SetAttribute(res, ui);
+        if(ui) {
+            this.SetAttribute(res, ui);
+        }
         return ui;
     }
 
     CreateFromComponent(res:any, mgr:UIMgr):UIWin
     {
         let ui:UIWin=null;
-        if(res.src) {
-            let src=this.resources[res.src];
-            ui=this.CreateFromComponent(src, mgr);
+        if(!res) {
+            return ui;
+        }
+        let attr=res[":@"];
+        if(attr.src) {
+            let src=this.resources[attr.src];
+            if(src===undefined) {
+                console.warn("CreateFromComponent src not found", res);
+            }else {
+                ui=this.CreateFromComponent(src, mgr);
+            }
         }else {
-            console.log("CreateFromComponent", res);
             ui=this.CreateWin(res, mgr);
+            //console.log("CreateFromComponent", res, ui);
         }
         if(!ui)
             return ui;
         this.SetAttribute(res, ui);
         if(!res.component)
             return ui;
-        for(let component_id in res.component) {
-            let component=res.component[component_id];
-            switch(component_id) {
-            case "displayList":
-                for(let display_id in component)  {
-                    let display=component[display_id];
-                    switch(display_id) {
-                    case "image":
-                        if(Array.isArray(display)) {
-                            for(let image of display) {
-                                let img=this.CreateImage(image, mgr);
-                                if(img) {
-                                    ui.AddChild(img);
-                                }    
-                            }
-                        }else {
-                            let img=this.CreateImage(display, mgr);
-                            if(img) {
-                                ui.AddChild(img);
-                            }
-                        }
-                        break;
-                    case "component":
-                        if(Array.isArray(display)) {
-                            for(let obj of display)    {
-                                let ch=this.CreateFromComponent(obj,mgr);
-                                if(ch) {
-                                    ui.AddChild(ch);
-                                }
-                            }
-                        }else {
-                            let ch=this.CreateFromComponent(display,mgr);
-                            if(ch) {
-                                ui.AddChild(ch);
-                            }
-                        }
-                        break;
-                    default:
-                        console.log("TODO CreateFromComponent:" + display_id, display);        
-                        break;
+        for(let component of res.component) {
+            if(component.displayList) {
+                for(let display of component.displayList) {
+                    let ch:UIWin=null;
+                    if(display.image) {
+                        ch=this.CreateImage(display, mgr);
+                    }
+                    else if(display.component) {
+                        ch=this.CreateFromComponent(display, mgr);
+                    }
+                    else {
+
+                        console.warn("TODO FGUI displayList", display);
+                    }
+                    if(ch) {
+                        ui.AddChild(ch);
                     }
                 }
-                break;
-            case "size":
-            case "Button":
-                break;
-            default:
-                console.log("TODO DisplayList:" + component_id, component);
-                break;
             }
         }
         return ui;

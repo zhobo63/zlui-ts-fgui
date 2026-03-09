@@ -16,23 +16,23 @@ export class App
         this.ui.backend=new BackendImGui(ImGui.GetBackgroundDrawList());
 
         let root:UIWin;
-        let fgui=await FGUI.Load("BlueSkin.fui", "res/BlueSkin/").then(fgui=>{
-            return fgui;
-        });
-        root=fgui.Create("Demo", mgr);
-        if(root) {
-            console.log("FGUI Demo",root);
-            mgr.AddChild(root);            
-        }
-
-        // let fgui=await FGUI.Load("Lobby_mixgame.fui", "res/Lobby_mixgame/").then(fgui=>{
+        // let fgui=await FGUI.Load("BlueSkin.fui", "res/BlueSkin/").then(fgui=>{
         //     return fgui;
         // });
-        // root=fgui.Create("main_all", mgr);
+        // root=fgui.Create("Demo", mgr);
         // if(root) {
-        //     console.log("FGUI Lobby_mixgame",root);
+        //     console.log("FGUI Demo",root);
         //     mgr.AddChild(root);            
         // }
+
+        let fgui=await FGUI.Load("Lobby_mixgame.fui", "res/Lobby_mixgame/").then(fgui=>{
+            return fgui;
+        });
+        root=fgui.Create("main_all", mgr);
+        if(root) {
+            console.log("FGUI Lobby_mixgame",root);
+            mgr.AddChild(root);            
+        }
 
         this.root=root;
 
