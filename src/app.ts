@@ -28,7 +28,7 @@ export class App
         let fgui=await FGUI.Load("Lobby_mixgame.fui", "res/Lobby_mixgame/").then(fgui=>{
             return fgui;
         });
-        root=fgui.Create("main_all", mgr);
+        root=fgui.Create("main_all", mgr) as UIWin;
         if(root) {
             console.log("FGUI Lobby_mixgame",root);
             mgr.AddChild(root);            
@@ -62,7 +62,7 @@ export class App
             let scalew=width/this.root.w;
             let scaleh=height/this.root.h;
             let scale=Math.min(scalew, scaleh);
-            this.root.scale=scale;
+            this.root.scale.Set(scale, scale);
         }
         this.ui.OnResize(width, height);
         this.ui.Refresh(0);
@@ -71,14 +71,14 @@ export class App
         return this.height>this.width;
     }
 
-    canvas:HTMLCanvasElement;
+    canvas!:HTMLCanvasElement;
     isDirty:boolean=false;
-    ui:UIMgr;    
-    width:number;
-    height:number;
+    ui!:UIMgr;    
+    width:number=0;
+    height:number=0;
 
-    fgui:FGUIPackage;
-    root:UIWin;
+    fgui!:FGUIPackage;
+    root!:UIWin;
 }
 
 export const gApp=new App;

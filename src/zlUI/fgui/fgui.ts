@@ -1,4 +1,4 @@
-import { ImageFont, BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin, UpdateTexturePack } from "@zhobo63/zlui-ts";
+import { ImageFont, BoardType, TexturePack, UIImage, UIImageText, UIMgr, UIPanel, UIWin, UpdateTexturePack, Align, ParseColor } from "@zhobo63/zlui-ts";
 import * as ZLIB from "pako"
 import * as XML from "fast-xml-parser"
 import { ImGui_Impl } from "@zhobo63/imgui-ts";
@@ -56,9 +56,9 @@ export class FGUIButton extends UIWin
         }
     }
 
-    win_disable:UIWin;
-    win_hover:UIWin;
-    win_down:UIWin;
+    win_disable?:UIWin;
+    win_hover?:UIWin;
+    win_down?:UIWin;
 }
 
 export class FGUIImageText extends UIImageText
@@ -79,6 +79,8 @@ export class FGUIImageText extends UIImageText
             if(ch._csid==UIImage.CSID) {
                 ch.isCanNotify=false;
                 let img=ch as UIImage; 
+                if(!(img.image && img.Name))
+                    continue;
                 if(img.image)
                     UpdateTexturePack(img.image);
                 let imgfont:ImageFont={
@@ -270,7 +272,7 @@ function ScaleType(s:string):EScaleType
 function ParseVec2(s:string):Vec2
 {
     let row=s.split(/,/);
-    return {x:Number.parseInt(row[0]),y:Number.parseInt(row[1]) }
+    return {x:Number.parseFloat(row[0]),y:Number.parseFloat(row[1]) }
 }
 function ParseVec4(s:string):Vec4
 {
@@ -306,6 +308,7 @@ function toTexturePack(sprite:Sprite):TexturePack
         x2:sprite.x+sprite.width,
         y2:sprite.y+sprite.height,
         texture:sprite.texture,    
+        scale:1,
     };
 }
 
@@ -322,12 +325,11 @@ interface Sprite
 
 }
 
-class FGUImage
-{
-    scale_type:EScaleType=EScaleType.None;
-    id:string;
-
-}
+// class FGUImage
+// {
+//     scale_type:EScaleType=EScaleType.None;
+//     id:string;
+// }
 
 class ByteBuffer
 {
@@ -385,9 +387,9 @@ class FGUIXmlFile extends FGUIFile
         this.data=xml_parser.parse(source);
     }
 
-    name:string;
-    source:string;
-    data:any;
+    // name:string;
+    // source:string;
+    // data:any;
 }
 
 class FGUIXmlParser
@@ -400,7 +402,7 @@ class FGUIXmlParser
     {
         let i=0;
         let start=0;
-        let file_name:string=null;
+        let file_name:string|undefined=undefined;
         let file_size:number=0;
         let files=this.package.files;
         
@@ -416,7 +418,7 @@ class FGUIXmlParser
                     files[file_name]=xml;
                     start+=file_size;
                     i=start;
-                    file_name=null;
+                    file_name=undefined;
                     file_size=0;
                 }
             }
@@ -533,9 +535,9 @@ export class FGUIPackage
         console.log(this);
         return this;
     }
-    Create(name:string, mgr:UIMgr):UIWin {
+    Create(name:string, mgr:UIMgr):UIWin|undefined {
         let res=this.resources[name];
-        let ui:UIWin=null;
+        let ui:UIWin|undefined;
         if(res) {
             ui=this.CreateFromResource(res, mgr);
         }else {
@@ -543,9 +545,9 @@ export class FGUIPackage
         }
         return ui;
     }
-    CreateFromResource(res:any, mgr:UIMgr):UIWin
+    CreateFromResource(res:any, mgr:UIMgr):UIWin|undefined
     {
-        let ui:UIWin=null;
+        let ui:UIWin|undefined;
         switch(res.type) {
         case EResourceType.Component:
             ui=this.CreateFromComponent(res, mgr);
@@ -561,7 +563,7 @@ export class FGUIPackage
         return ui;
     }
 
-    CreateWin(res:any, mgr:UIMgr):UIWin
+    CreateWin(res:any, mgr:UIMgr):UIWin|undefined
     {
         let type:EUIType=EUIType.Win;
         let attr=res[":@"];
@@ -580,7 +582,7 @@ export class FGUIPackage
             }
         }
 
-        let ui:UIWin=null;
+        let ui:UIWin;
         switch(type) {
         case EUIType.Win:
             ui=new UIWin(mgr);
@@ -602,7 +604,7 @@ export class FGUIPackage
             break;
         default:
             console.warn(`TODO CreateWin type:${type}`, res);
-            return null;
+            return undefined;
         }
         ui.Name=name;
         return ui;
@@ -610,6 +612,11 @@ export class FGUIPackage
     SetAttribute(res:any, ui:UIWin)
     {
         let attr=res[":@"]
+        let fontName;
+        let fontSize;
+        let fontStyle="normal";
+        let textAlignW=Align.Center;
+        let textAlignH=Align.Center;
         for(let id in attr) {
             let val=attr[id];
             switch(id) {
@@ -652,15 +659,15 @@ export class FGUIPackage
                     break;
                 default:
                     let scale=ParseVec2(val);
-                    if(scale.x<0) {
-                        ui.FlipW();
-                    }
-                    if(scale.y<0) {
-                        ui.FlipH();
-                    }
-                    // ui.w*=scale.x;
-                    // ui.h*=scale.y;
-                    // ui.isCalRect=true;        
+                    ui.scale.x=scale.x;
+                    ui.scale.y=scale.y;
+                    // if(scale.x<0) {
+                    //     ui.FlipW();
+                    // }
+                    // if(scale.y<0) {
+                    //     ui.FlipH();
+                    // }
+                    ui.isCalRect=true;        
                     break;
                 }
                 break;
@@ -678,17 +685,71 @@ export class FGUIPackage
             case "color":
                 ui.SetColor(val);
                 break;
+            case "text":
+                ui.SetText(val);
+                break;
+            case "font":
+                fontName=val;
+                break;
+            case "fontSize":
+                fontSize=val;
+                break;
+            case "autoSize":
+                break;
+            case "bold":
+                fontStyle=val?"bold":"normal";
+                break;
+            case "align":
+                switch(val) {
+                case "left":
+                    textAlignW=Align.Left;
+                    break;
+                case "right":
+                    textAlignW=Align.Right;
+                    break;
+                case "center":
+                    textAlignW=Align.Center;
+                    break;
+                default:
+                    console.warn("TODO SetAttribute:"+id, {res:res, value:val});
+                    break;
+                }
+                break;
+            case "vAlign":
+                switch(val) {
+                case "top":
+                    textAlignH=Align.Top;
+                    break;
+                case "bottom":
+                    textAlignH=Align.Down;
+                    break;
+                case "middle":
+                    textAlignH=Align.Center;
+                    break;
+                default:
+                    console.warn("TODO SetAttribute:"+id, {res:res, value:val});
+                    break;
+                }
+                break;
             default:
                 console.warn("TODO SetAttribute:"+id, {res:res, value:val});
                 break;
             }
         }
+        if(ui._csid==UIPanel.CSID) {
+            let pnl=ui as UIPanel;
+            if(fontName && fontSize) {
+                pnl.font=pnl._owner.CreateFont(fontName, fontSize, fontStyle);
+            }
+            pnl.textAlignW=textAlignW;
+            pnl.textAlignH=textAlignH;
+        }
     }
 
-    CreateImage(res:any, mgr:UIMgr):UIImage
+    CreateImage(res:any, mgr:UIMgr):UIImage|undefined
     {        
         let attr=res[":@"];
-        let ui:UIImage=null;
+        let ui:UIImage|undefined;
         if(!res) {
         }
         else if(attr.src) {
@@ -738,10 +799,36 @@ export class FGUIPackage
         }
         return ui;
     }
-
-    CreateFromComponent(res:any, mgr:UIMgr):UIWin
+    CreateText(res:any, mgr:UIMgr):UIPanel|undefined
     {
-        let ui:UIWin=null;
+        let attr=res[":@"];
+        let ui:UIPanel|undefined;
+        if(!res) {
+        }
+        else if(attr.src) {
+            let src=this.resources[attr.src];
+            if(src === undefined) {
+                console.warn("fgui CreateText src not found", res);
+                ui=new UIPanel(mgr);
+            }else {
+                ui=this.CreateText(src, mgr);
+            }
+        }else {
+            ui=new UIPanel(mgr);
+            ui.isDrawBorder=false;
+            ui.isDrawClient=false;
+            ui.textColor=ParseColor(attr.color);
+            //console.log("fgui Text", attr)
+        }
+        if(ui) {
+            this.SetAttribute(res, ui);
+        }
+        return ui;
+    }
+
+    CreateFromComponent(res:any, mgr:UIMgr):UIWin|undefined
+    {
+        let ui:UIWin|undefined;
         if(!res) {
             return ui;
         }
@@ -765,12 +852,15 @@ export class FGUIPackage
         for(let component of res.component) {
             if(component.displayList) {
                 for(let display of component.displayList) {
-                    let ch:UIWin=null;
+                    let ch:UIWin|undefined;
                     if(display.image) {
                         ch=this.CreateImage(display, mgr);
                     }
                     else if(display.component) {
                         ch=this.CreateFromComponent(display, mgr);
+                    }
+                    else if(display.text) {
+                        ch=this.CreateText(display, mgr);
                     }
                     else {
 
@@ -785,7 +875,7 @@ export class FGUIPackage
         return ui;
     }
 
-    version:number;
+    //version:number;
     path:string;
     files:{[key:string]:FGUIFile}={}
     textures:{[key:string]:ImGui_Impl.Texture}={}
